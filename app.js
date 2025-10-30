@@ -7,8 +7,12 @@ import morgan from "morgan";
 import AppError from "./utils/error.utils.js";
 import fs from 'node:fs/promises';
 import path from "node:path";
-import userroutes from "./routes/user.routes.js"
-import postroutes from "./routes/post.routes.js"
+import userRoutes from "./routes/user.routes.js"
+import postRoutes from "./routes/post.routes.js"
+import commentRoutes from "./routes/comments.routes.js"
+import categoryRoutes from "./routes/categories.routes.js"
+import tagRoutes from "./routes/tags.routes.js"
+import adminRoutes from "./routes/admin.routes.js"
 // import { Buffer } from 'node:buffer';
 
 // Creates a zero-filled Buffer of length 10.
@@ -105,10 +109,15 @@ app.use(cookieparser());
 
 //alluser related routes is route me run karenge
 //humne controller me error ko next kar diya hai now if error come then line 27 ke aage error pass ho jaegi
-console.log("[blog_backend/app.js] before userroutes")
-app.use('/api/v1/user',userroutes);
-console.log("[blog_backend/app.js] before postroutes")
-app.use('/api/v1/post',postroutes);
+// console.log("[blog_backend/app.js] before userRoutes")
+app.use('/api/v1/user',userRoutes);
+// console.log("[blog_backend/app.js] before postRoutes")
+app.use('/api/v1/post',postRoutes);
+app.use('/api/v1/comment',commentRoutes);
+app.use('/api/v1/category',categoryRoutes);
+app.use('/api/v1/tag',tagRoutes);
+app.use('/api/v1/admin',adminRoutes);
+
 // app.use('/api/v1/course',courseroutes);
 // app.use('/api/v1/payment',paymentRoutes);
 // app.use('/api/v1/miscellaneous',miscellaneous);

@@ -4,14 +4,17 @@ import AppError from "../utils/error.utils.js";
 import { json } from "express";
 
 const isloggedin=async(req,res,next)=>{
-   
-    // const token=req.rawHeaders[1];
+
+    try{
+
+        
+        // const token=req.rawHeaders[1];
     const token=req.cookies.token;//yeh cookie parser ki help se parse hua hai yahan
 // console.log("req",req);
 console.log("[blog_backend/middleware/auth.middleware.js]req.cookies",req.cookies);
 
     // console.log("token",req.rawHeaders[1]);
-
+    
     if(!token){
         return next(new AppError("unauthenticated,please login again",401));
     }
@@ -21,6 +24,11 @@ console.log("[blog_backend/middleware/auth.middleware.js]req.cookies",req.cookie
     req.body.user=userDetails;
     
     next();
+}
+catch(err){
+
+    return next(new AppError(err.message,401));
+}
     
 }
     
