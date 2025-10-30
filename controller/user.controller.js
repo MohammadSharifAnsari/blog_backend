@@ -489,7 +489,7 @@ const updateuser = async (req, res, next) => {
     const userId = req.user._id; // assuming authentication middleware adds this
 
     // 1️⃣ Fetch user and populate bookmarks
-    const user = await User.findById(userId).populate({
+    const user = await usermodel.findById(userId).populate({
       path: "bookmarks",
       select: "title content author createdAt updatedAt avatar", // choose fields you want to show
       populate: {
