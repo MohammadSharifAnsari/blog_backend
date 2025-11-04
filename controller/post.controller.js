@@ -7,6 +7,7 @@ import AppError from "../utils/error.utils.js";
 import commentModel from "../model/comment.schema.js"; 
 import userModel from "../model/user.schema.js";
 import mongoose from "mongoose";
+import crypto from "crypto";
 
 export const createPost = async (req, res, next) => {
   try {
@@ -84,35 +85,55 @@ export const createPost = async (req, res, next) => {
       }
     }
 
-    // 4️⃣ Handle categories (find or create)
+    // 4️⃣ Handle categories (accept IDs or names; create if name doesn't exist)
     let categoryIds = [];
     if (categories) {
       const categoryArray = Array.isArray(categories)
         ? categories
-        : categories.split(",").map((c) => c.trim());
+        : categories.split(",").map((c) => c.trim()).filter(Boolean);
 
-      for (const name of categoryArray) {
-        let category = await categoryModel.findOne({ name });
-        if (!category) {
-          category = await categoryModel.create({ name });
+      for (const token of categoryArray) {
+        let categoryDoc = null;
+        if (mongoose.Types.ObjectId.isValid(token)) {
+          // If token is a valid ObjectId and exists, use it
+          categoryDoc = await categoryModel.findById(token);
         }
-        categoryIds.push(category._id);
+        if (!categoryDoc) {
+          // Treat token as a name (case-insensitive find or create)
+          const name = token.trim();
+          categoryDoc = await categoryModel.findOne({
+            name: { $regex: new RegExp(`^${name}$`, "i") },
+          });
+          if (!categoryDoc) {
+            categoryDoc = await categoryModel.create({ name });
+          }
+        }
+        categoryIds.push(categoryDoc._id);
       }
     }
 
-    // 5️⃣ Handle tags (find or create)
+    // 5️⃣ Handle tags (accept IDs or names; create if name doesn't exist)
     let tagIds = [];
     if (tags) {
       const tagArray = Array.isArray(tags)
         ? tags
-        : tags.split(",").map((t) => t.trim());
+        : tags.split(",").map((t) => t.trim()).filter(Boolean);
 
-      for (const name of tagArray) {
-        let tag = await tagModel.findOne({ name });
-        if (!tag) {
-          tag = await tagModel.create({ name });
+      for (const token of tagArray) {
+        let tagDoc = null;
+        if (mongoose.Types.ObjectId.isValid(token)) {
+          tagDoc = await tagModel.findById(token);
         }
-        tagIds.push(tag._id);
+        if (!tagDoc) {
+          const name = token.trim();
+          tagDoc = await tagModel.findOne({
+            name: { $regex: new RegExp(`^${name}$`, "i") },
+          });
+          if (!tagDoc) {
+            tagDoc = await tagModel.create({ name });
+          }
+        }
+        tagIds.push(tagDoc._id);
       }
     }
 
@@ -129,6 +150,17 @@ export const createPost = async (req, res, next) => {
       isPublished: isPublished || true,
       publishedAt: isPublished ? new Date() : null,
     });
+
+    // 6.1️⃣ Also add this post to the author's posts array
+    try {
+      await userModel.findByIdAndUpdate(
+        req.body.user.id,
+        { $addToSet: { posts: post._id } },
+        { new: false }
+      );
+    } catch (e) {
+      console.warn("[createPost] Failed to add post to user.posts:", e?.message);
+    }
 
     // 7️⃣ Response
     res.status(201).json({
@@ -247,9 +279,32 @@ export const getPostById = async (req, res, next) => {
       return next(new AppError("Post not found", 404));
     }
 
-    // 4️⃣ Optionally increase view count
-    post.views += 1;
-    await post.save();
+    // 4️⃣ Optionally increase view count (unique per user or anonymous fingerprint)
+    const viewerId = req.body.user?.id;
+    if (viewerId && mongoose.Types.ObjectId.isValid(viewerId)) {
+      const alreadyViewed = (post.viewedBy || []).some(
+        (uid) => uid.toString() === viewerId.toString()
+      );
+      if (!alreadyViewed) {
+        post.viewedBy = [...(post.viewedBy || []), viewerId];
+        post.views = (post.views || 0) + 1;
+        await post.save();
+      }
+    } else {
+      const ip = req.ip || "";
+      const ua = req.headers["user-agent"] || "";
+      const anonKey = crypto
+        .createHash("sha1")
+        .update(`${ip}|${ua}`)
+        .digest("hex");
+
+      const alreadyViewedAnon = (post.viewedByAnon || []).includes(anonKey);
+      if (!alreadyViewedAnon) {
+        post.viewedByAnon = [...(post.viewedByAnon || []), anonKey];
+        post.views = (post.views || 0) + 1;
+        await post.save();
+      }
+    }
 
     // 5️⃣ Send success response
     res.status(200).json({
@@ -269,7 +324,7 @@ export const getPostById = async (req, res, next) => {
 
 export const updatePost = async (req, res, next) => {
   try {
-    const { id } = req.params; // post ID from route
+    const id = (req.params?.id || "").replace(/^:/, ""); // sanitize accidental leading colon
     const user = req.body.user; // current logged-in user (from auth middleware)
     const { title, content, categories, tags, isPublished } = req.body;
 
@@ -659,26 +714,48 @@ export const incrementView = async (req, res) => {
       });
     }
 
-    // 2. Use findOneAndUpdate to atomically increment views
-    //    - Only increment if post exists AND is published
-    const updatedPost = await postModel.findOneAndUpdate(
-      { _id: id, isPublished: true },
-      { $inc: { views: 1 } },
-      { new: true, select: "views" } // return only updated views
-    );
+    // 2. Unique count for authenticated users; fallback to anonymous fingerprint
+    const viewerId = req.body.user?.id;
+    let updatedPost;
+    if (viewerId && mongoose.Types.ObjectId.isValid(viewerId)) {
+      updatedPost = await postModel.findOneAndUpdate(
+        { _id: id, isPublished: true, viewedBy: { $ne: viewerId } },
+        { $addToSet: { viewedBy: viewerId }, $inc: { views: 1 } },
+        { new: true, select: "views" }
+      );
+      if (!updatedPost) {
+        return res.status(200).json({
+          success: true,
+          message: "View already counted or post unavailable",
+          data: { postId: id },
+        });
+      }
+    } else {
+      const ip = req.ip || "";
+      const ua = req.headers["user-agent"] || "";
+      const anonKey = crypto
+        .createHash("sha1")
+        .update(`${ip}|${ua}`)
+        .digest("hex");
 
-    // 3. If post not found or not published
-    if (!updatedPost) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found or not published",
-      });
+      updatedPost = await postModel.findOneAndUpdate(
+        { _id: id, isPublished: true, viewedByAnon: { $ne: anonKey } },
+        { $addToSet: { viewedByAnon: anonKey }, $inc: { views: 1 } },
+        { new: true, select: "views" }
+      );
+      if (!updatedPost) {
+        return res.status(200).json({
+          success: true,
+          message: "Anonymous view already counted or post unavailable",
+          data: { postId: id },
+        });
+      }
     }
 
-    // 4. Success response
+    // 3. Success response
     res.status(200).json({
       success: true,
-      message: "View count incremented",
+      message: "Unique view counted",
       data: {
         postId: id,
         views: updatedPost.views,
@@ -698,8 +775,8 @@ export const getPostsWithFilters = async (req, res) => {
     console.log("start")
     const {
       search = "",
-      tag,
-      category,
+      tag: tagParam,
+      category: categoryParam,
       page = 1,
       limit = 10,
     } = req.query;
@@ -713,25 +790,29 @@ export const getPostsWithFilters = async (req, res) => {
     // Build filter object
     const filter = { isPublished: true };
 
-    // ---- 2. Add Tag/Category Filters (if provided) ----
-    if (tag) {
-      if (!mongoose.Types.ObjectId.isValid(tag)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid tag ID",
-        });
+    // ---- 2. Add Tag/Category Filters (support single or multiple CSV) ----
+    if (tagParam) {
+      const tagTokens = String(tagParam).split(",").map((t) => t.trim()).filter(Boolean);
+      const validTagIds = [];
+      for (const t of tagTokens) {
+        if (!mongoose.Types.ObjectId.isValid(t)) {
+          return res.status(400).json({ success: false, message: `Invalid tag ID: ${t}` });
+        }
+        validTagIds.push(t);
       }
-      filter.tags = tag;
+      filter.tags = validTagIds.length > 1 ? { $in: validTagIds } : validTagIds[0];
     }
 
-    if (category) {
-      if (!mongoose.Types.ObjectId.isValid(category)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid category ID",
-        });
+    if (categoryParam) {
+      const catTokens = String(categoryParam).split(",").map((c) => c.trim()).filter(Boolean);
+      const validCatIds = [];
+      for (const c of catTokens) {
+        if (!mongoose.Types.ObjectId.isValid(c)) {
+          return res.status(400).json({ success: false, message: `Invalid category ID: ${c}` });
+        }
+        validCatIds.push(c);
       }
-      filter.categories = category;
+      filter.categories = validCatIds.length > 1 ? { $in: validCatIds } : validCatIds[0];
     }
 
     // ---- 3. Build Regex Search (case-insensitive) ----

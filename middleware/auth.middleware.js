@@ -22,6 +22,7 @@ console.log("[blog_backend/middleware/auth.middleware.js]req.cookies",req.cookie
     const userDetails=await jwd.verify(token,process.env.SECRET);//return the decoded token means payload
     //jab bhi loggedin function call hoga woh request.body me ek user object de dega
     req.body.user=userDetails;
+    console.log("[blog_backend/middleware/auth.middleware.js] userDetails from token>>",userDetails);
     
     next();
 }

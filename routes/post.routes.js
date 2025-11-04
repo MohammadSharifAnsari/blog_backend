@@ -30,7 +30,7 @@ router.post("/:id/like",isloggedin,likePost);
 router.post("/:id/comment",isloggedin,addComment)
 router.get("/:id/comment",isloggedin,getCommentsByPost)
 router.get("/related/:id",isloggedin,getRelatedPosts)
-router.put("/:id/views",incrementView)
+router.put("/:id/views",isloggedin,incrementView)
 router.get("/filtersearch",getPostsWithFilters);
 
 // 68f7de90783c72109e306321

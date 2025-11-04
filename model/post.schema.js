@@ -36,6 +36,8 @@ const postSchema = new mongoose.Schema(
     categories: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag" }],
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // users who liked
+    viewedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // unique viewers
+    viewedByAnon: [{ type: String }], // unique anonymous viewers (hashed IP+UA)
     views: { type: Number, default: 0 },
     isPublished: { type: Boolean, default: true },
     publishedAt: { type: Date },

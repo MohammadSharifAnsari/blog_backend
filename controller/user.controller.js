@@ -431,7 +431,9 @@ const updateuser = async (req, res, next) => {
  const bookmarkpost = async (req, res, next) => {
   try {
     const { postId } = req.params;
-    const userId = req.user._id; 
+    console.log(`[blog_backend/controller/user.controller.js] user>> ${req.user}`);
+    const userId = req.body.user.id; 
+    console.log(`[blog_backend/controller/user.controller.js] bookmarkpost called with postId: ${postId} by userId: ${userId}`);
 
     // 1. Check if the post exists
     const post = await postmodel.findById(postId);
@@ -486,7 +488,7 @@ const updateuser = async (req, res, next) => {
 };
  const getBookmarkedPosts = async (req, res, next) => {
   try {
-    const userId = req.user._id; // assuming authentication middleware adds this
+    const userId = req.body.user.id; // assuming authentication middleware adds this
 
     // 1️⃣ Fetch user and populate bookmarks
     const user = await usermodel.findById(userId).populate({

@@ -76,7 +76,7 @@ return match;
 //update(resetToken) ko encrypt karna hai
 //digest('hex') means hex me digest kar dena hai
 
-    this.forgetPasswordExpiry=Date.now()+15*60*100;//jab humne token generate kiya tabse 15 minute tak valid hoga uske baad expire hojaega yahan hum miliseconds me dete hai\
+    this.forgetPasswordExpiry=Date.now()+15*60*1000;// 15 minutes in milliseconds
 //     import { Buffer } from 'node:buffer';
 
 // // Creates a zero-filled Buffer of length 10.
