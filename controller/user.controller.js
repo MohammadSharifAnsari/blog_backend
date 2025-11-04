@@ -1,4 +1,3 @@
-
 import usermodel from "../model/user.schema.js";
 import postmodel from "../model/post.schema.js"
 import AppError from "../utils/error.utils.js";
@@ -8,7 +7,7 @@ import fs from 'fs/promises';
 import sendEmail from "../utils/sendMail.utils.js";
 import crypto from "crypto"
 import passwordUpdated from "../mail/passwordUpdate.js";
-import takeNewPassword from "../mail/TakePassword.js";
+import TakePassword from '../mail/takePassword.js';
 
 
 const cookieOptions = {
@@ -253,7 +252,7 @@ const forgot = async (req, res, next) => {
 
     try {
         const subject = "reset-password";
-        const message = takeNewPassword(email,user?.name,resetPasswordURL);
+        const message = TakePassword(email,user?.name,resetPasswordURL);
 {/* <a>${resetPasswordURL}</a> */}
 
         await sendEmail(email, subject, message);//this function sent the email to user
@@ -306,7 +305,7 @@ const reset = async (req, res, next) => {
         await user.save();
         return res.status(200).json({
             success: true,
-            message: "your passsword has been updated"
+            message: "your passsord has been updated"
         })
 
 

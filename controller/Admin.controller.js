@@ -10,7 +10,7 @@ import fs from 'fs/promises';
 import sendEmail from "../utils/sendMail.utils.js";
 import crypto from "crypto"
 import passwordUpdated from "../mail/passwordUpdate.js";
-import takeNewPassword from "../mail/TakePassword.js";
+import takeNewPassword from "../mail/takePassword.js";
 import mongoose from "mongoose";
 
 
