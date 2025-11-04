@@ -87,13 +87,25 @@ app.use(express.urlencoded({extended:true}));//work for post in html form
 //   }
 // }
 // ✅ Use extended: true when handling complex form data with nested objects.
-
+const allowedOrigins = [process.env.FRONTEND_URL3,process.env.FRONTEND_URL1,process.env.FRONTEND_URL2];
 
 app.use(cors({
-origin:[process.env.FRONTEND_URL3,process.env.FRONTEND_URL1],
-credentials:true//backend allow browser to send cookie
-
+    origin: (origin, callback) => {
+     // 📌 This prints every time browser requests
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new AppError('Not allowed by CORS'));
+        }
+    },
+    credentials: true   // allow sending cookies
 }));
+
+// app.use(cors({
+// origin:[process.env.FRONTEND_URL3,process.env.FRONTEND_URL1],
+// credentials:true//backend allow browser to send cookie
+
+// }));
 // app.use(cookieParser());
 
 app.use(cookieparser());
